@@ -1,0 +1,100 @@
+<section class="results-container">
+  <div class="results-layout">
+    <header class="results-hero">
+      <div class="hero-left">
+        <span class="badge">Catalog Search</span>
+        <h2 class="title">Results for "{{ query() }}"</h2>
+        <p class="subtitle">
+          Found <strong>{{ results().length }}</strong> matching records in <strong>{{ searchMode }}</strong>.
+        </p>
+      </div>
+      <div class="hero-right" *ngIf="query()">
+        <div class="query-pill">
+          <span class="label">Query</span>
+          <span class="val">{{ query() }}</span>
+        </div>
+      </div>
+    </header>
+
+    <div *ngIf="loading()" class="status-box">
+      <span class="loader"></span>
+      <p>Fetching records from the index...</p>
+    </div>
+
+    <div *ngIf="error()" class="status-box error">
+      <p>{{ error() }}</p>
+    </div>
+
+    <div *ngIf="!loading() && !error() && results().length === 0" class="status-box empty">
+      <p>No results found for "{{ query() }}". Try a different search term.</p>
+    </div>
+
+    <div class="results-list" *ngIf="results().length > 0">
+      <article
+        class="record-card"
+        *ngFor="let movie of results()"
+        (click)="navigateToMovie(movie)"
+      >
+        <div class="record-visual">
+          <div class="visual-placeholder">
+            {{ movie.movie_title ? movie.movie_title.charAt(0) : 'M' }}
+          </div>
+          <div class="rating-tag">
+            <span class="rating-label">IMDb</span>
+            <span class="rating-val">{{ movie.imdb_rating != null ? movie.imdb_rating : '--' }}</span>
+          </div>
+        </div>
+
+        <div class="record-body">
+          <div class="body-top">
+            <div class="title-wrap">
+              <h3 class="movie-title" *ngIf="movie.highlight?.movie_title?.length; else plainTitle"
+                  [innerHTML]="movie.highlight!.movie_title![0]"></h3>
+              <ng-template #plainTitle>
+                <h3 class="movie-title">{{ movie.movie_title }}</h3>
+              </ng-template>
+            </div>
+            <div class="genre-row">
+              <span *ngFor="let genre of (movie.genres || []).slice(0, 3)" class="genre-chip">
+                {{ genre }}
+              </span>
+            </div>
+          </div>
+
+          <div class="body-mid">
+            <div class="info-line" *ngIf="directorNames(movie)">
+              <span class="info-label">Director</span>
+              <span class="info-val">{{ directorNames(movie) }}</span>
+            </div>
+            <div class="info-line">
+              <span class="info-label">Cast</span>
+              <span class="info-val">{{ actorNames(movie) }}</span>
+            </div>
+          </div>
+
+          <footer class="body-bottom">
+            <div class="meta-links">
+              <span class="meta-item" *ngIf="movie.popularity != null">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor" stroke-width="2.5"
+                     stroke-linecap="round" stroke-linejoin="round" class="meta-icon">
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                </svg>
+                Pop {{ movie.popularity | number:'1.0-1' }}
+              </span>
+              <span class="meta-item" *ngIf="movie.imdb_vote_count">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor" stroke-width="2.5"
+                     stroke-linecap="round" stroke-linejoin="round" class="meta-icon">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+                {{ movie.imdb_vote_count | number }} votes
+              </span>
+            </div>
+            <div class="action-hint">View details →</div>
+          </footer>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>

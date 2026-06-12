@@ -1,0 +1,26 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  background: var(--bg-main);
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+app-searchbar {
+  flex: 0 0 auto;
+  z-index: 100;
+  background: rgba(18, 18, 18, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border-soft);
+  position: sticky;
+  top: 0;
+}
+
+router-outlet {
+  flex: 1 1 auto;
+}

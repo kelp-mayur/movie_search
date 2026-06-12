@@ -1,0 +1,89 @@
+<section class="detail-container">
+  <div *ngIf="loading()" class="status-wrap">
+    <span class="loader"></span>
+    <p>Loading record details...</p>
+  </div>
+
+  <div *ngIf="error()" class="status-wrap is-error">
+    <p>{{ error() }}</p>
+  </div>
+
+  <article *ngIf="movie() as movie" class="detail-card">
+    <header class="detail-hero">
+      <div class="hero-main">
+        <div class="category-badge">Talkie Index</div>
+        <h1 class="movie-title">{{ movie.movie_title }}</h1>
+        <div class="movie-meta">
+          <span class="meta-part" *ngIf="movie.genres?.length">
+            {{ movie.genres!.join(' · ') }}
+          </span>
+        </div>
+      </div>
+      <div class="hero-score">
+        <div class="rating-title">IMDb Rating</div>
+        <div class="rating-val-wrapper">
+          <svg class="gold-star" viewBox="0 0 24 24">
+            <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+          </svg>
+          <div class="rating-text-group">
+            <span class="rating-num">{{ movie.imdb_rating != null ? movie.imdb_rating : '--' }}</span>
+            <span class="rating-den">/10</span>
+          </div>
+        </div>
+        <div class="vote-count" *ngIf="movie.imdb_vote_count">
+          {{ movie.imdb_vote_count | number }} votes
+        </div>
+      </div>
+    </header>
+
+    <div class="detail-content">
+      <section class="content-left">
+        <div class="overview-block" *ngIf="movie.overview">
+          <h2>Overview</h2>
+          <p>{{ movie.overview }}</p>
+        </div>
+
+        <div class="genres-wrap" *ngIf="movie.genres?.length">
+          <span *ngFor="let g of movie.genres" class="genre-pill">{{ g }}</span>
+        </div>
+
+        <div class="cast-block" *ngIf="movie.cast?.length">
+          <h3>Featured Cast</h3>
+          <p class="actor-list">{{ actorNames(movie) }}</p>
+        </div>
+
+        <div class="keywords-block" *ngIf="movie.keywords?.length">
+          <h3>Keywords</h3>
+          <div class="kw-list">
+            <span *ngFor="let k of movie.keywords" class="kw-tag">#{{ k }}</span>
+          </div>
+        </div>
+      </section>
+
+      <aside class="content-right">
+        <div class="vertical-specs">
+          <h3>Specifications</h3>
+          <div class="spec-row">
+            <span class="spec-label">Director</span>
+            <span class="spec-val">{{ directorNames(movie) }}</span>
+          </div>
+          <div class="spec-row">
+            <span class="spec-label">Popularity</span>
+            <span class="spec-val">{{ movie.popularity != null ? (movie.popularity | number:'1.0-2') : 'N/A' }}</span>
+          </div>
+          <div class="spec-row">
+            <span class="spec-label">User Rating</span>
+            <span class="spec-val">
+              {{ movie.user_rating != null ? (movie.user_rating | number:'1.1-1') : 'N/A' }}
+              <span *ngIf="movie.user_rating_count"> ({{ movie.user_rating_count | number }} reviews)</span>
+            </span>
+          </div>
+          <div class="spec-row" *ngIf="movie.original_title && movie.original_title !== movie.movie_title">
+            <span class="spec-label">Original Title</span>
+            <span class="spec-val">{{ movie.original_title }}</span>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </article>
+</section>
