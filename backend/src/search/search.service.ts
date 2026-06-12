@@ -56,25 +56,25 @@ export class SearchService {
         {
           constant_score: {
             filter: { term: { 'movie_title.keyword': qLower } },
-            boost: 100_000,
+            boost: 100,
           },
         },
         {
           constant_score: {
             filter: { term: { movie_title_normalized: qLower } },
-            boost: 90_000,
+            boost: 100,
           },
         },
         {
           constant_score: {
             filter: { prefix: { 'movie_title.keyword': qLower } },
-            boost: 20_000,
+            boost: 90,
           },
         },
         {
           constant_score: {
             filter: { prefix: { movie_title_normalized: qLower } },
-            boost: 15_000,
+            boost: 90,
           },
         },
       ];
@@ -84,31 +84,31 @@ export class SearchService {
       {
         constant_score: {
           filter: { term: { 'movie_title.keyword': qLower } },
-          boost: 100_000,
+          boost: 100,
         },
       },
       {
         constant_score: {
           filter: { term: { movie_title_normalized: qLower } },
-          boost: 90_000,
+          boost: 100,
         },
       },
       {
         constant_score: {
           filter: { term: { movie_title_compact: compact } },
-          boost: 80_000,
+          boost: 100,
         },
       },
       {
         constant_score: {
           filter: { prefix: { 'movie_title.keyword': qLower } },
-          boost: 20_000,
+          boost: 90,
         },
       },
       {
         constant_score: {
           filter: { prefix: { movie_title_normalized: qLower } },
-          boost: 18_000,
+          boost: 90,
         },
       },
 
@@ -126,33 +126,16 @@ export class SearchService {
               ],
             },
           },
-          boost: 10_000,
-        },
-      },
-      // {
-      //   constant_score: {
-      //     filter: { match: { 'movie_title.compound': compact } },
-      //     boost: 5_000,
-      //   },
-      // },
-      {
-        constant_score: {
-          filter: {
-            match: { 'movie_title.prefix': { query: q, operator: 'and' } },
-          },
-          boost: 3_000,
         },
       },
       // {
       //   constant_score: {
       //     filter: {
-      //       match: { 'movie_title.shingle': { query: q, operator: 'and' } },
+      //       match: { 'movie_title.prefix': { query: q, operator: 'and' } },
       //     },
-      //     boost: 1_500,
       //   },
       // },
     ];
-
     return clauses;
   }
 
@@ -165,13 +148,13 @@ export class SearchService {
         {
           constant_score: {
             filter: { term: { [`${field}.keyword`]: qLower } },
-            boost: 50_000,
+            boost: 70,
           },
         },
         {
           constant_score: {
             filter: { prefix: { [`${field}.keyword`]: qLower } },
-            boost: 15_000,
+            boost: 50,
           },
         },
       ];
@@ -181,44 +164,15 @@ export class SearchService {
       {
         constant_score: {
           filter: { term: { [`${field}.keyword`]: qLower } },
-          boost: 50_000,
+          boost: 60,
         },
       },
       {
         constant_score: {
           filter: { prefix: { [`${field}.keyword`]: qLower } },
-          boost: 5000,
+          boost: 50,
         },
       },
-
-      {
-        constant_score: {
-          filter: {
-            match: { [`${field}.prefix`]: { query: q, operator: 'and' } },
-          },
-          boost: 3000,
-        },
-      },
-
-      // ...(q.length >= 4
-      //   ? [
-      //       {
-      //         constant_score: {
-      //           filter: {
-      //             match: {
-      //               [field]: {
-      //                 query: q,
-      //                 operator: 'and',
-      //                 fuzziness: 1,
-      //                 prefix_length: 0,
-      //               },
-      //             },
-      //           },
-      //           boost: 200,
-      //         },
-      //       },
-      //     ]
-      //   : []),
     ];
   }
 
@@ -232,20 +186,17 @@ export class SearchService {
 
       ...this.buildPersonClauses('cast', q),
 
-      {
-        constant_score: {
-          filter: { term: { genres: q.toLowerCase() } },
-          boost: 2_000,
-        },
-      },
-      {
-        constant_score: {
-          filter: { prefix: { genres: q.toLowerCase() } },
-          boost: 800,
-        },
-      },
-
-      { match: { keywords: { query: q, operator: 'and', boost: 500 } } },
+      // {
+      //   constant_score: {
+      //     filter: { term: { genres: q.toLowerCase() } },
+      //   },
+      // },
+      // {
+      //   constant_score: {
+      //     filter: { prefix: { genres: q.toLowerCase() } },
+      //   },
+      // },
+      { match: { keywords: { query: q, operator: 'and' } } },
     ];
 
     return this.runSearch(shouldClauses, {
@@ -279,28 +230,25 @@ export class SearchService {
     const qLower = query.trim().toLowerCase();
     const clauses: unknown[] = [
       {
-        constant_score: { filter: { term: { genres: qLower } }, boost: 10_000 },
+        constant_score: { filter: { term: { genres: qLower } }, boost: 50 },
       },
       {
         constant_score: {
           filter: { prefix: { genres: qLower } },
-          boost: 4_000,
+          boost: 40,
         },
       },
-      { match: { keywords: { query, operator: 'and', boost: 2_000 } } },
+      { match: { keywords: { query, operator: 'and' } }, boost: 30 },
       {
         constant_score: {
-          filter: { term: { 'keywords.keyword': qLower } },
-          boost: 1_500,
+          filter: { term: { 'keywords.keyword': qLower }, boost: 50 },
+          boost: 2,
         },
       },
-      { match: { movie_title: { query, operator: 'and', boost: 400 } } },
-      { match: { overview: { query, operator: 'and', boost: 100 } } },
     ];
     return this.runSearch(clauses, {
       genres: {},
       keywords: {},
-      movie_title: {},
     });
   }
 
@@ -350,7 +298,6 @@ export class SearchService {
           boost_mode: 'sum',
         },
       },
-      min_score: 100,
       highlight: {
         pre_tags: ['<mark>'],
         post_tags: ['</mark>'],
