@@ -71,7 +71,6 @@ export class SearchService {
             boost: 20_000,
           },
         },
-        // Also prefix on normalized (handles "the " prefix edge-cases)
         {
           constant_score: {
             filter: { prefix: { movie_title_normalized: qLower } },
@@ -229,10 +228,8 @@ export class SearchService {
     const shouldClauses: unknown[] = [
       ...this.buildTitleClauses(q),
 
-      // Director
       ...this.buildPersonClauses('director', q),
 
-      // Cast
       ...this.buildPersonClauses('cast', q),
 
       {
@@ -297,7 +294,6 @@ export class SearchService {
           boost: 1_500,
         },
       },
-      // Broad: also search title/overview for the genre/keyword
       { match: { movie_title: { query, operator: 'and', boost: 400 } } },
       { match: { overview: { query, operator: 'and', boost: 100 } } },
     ];
