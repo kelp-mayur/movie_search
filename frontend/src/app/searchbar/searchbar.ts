@@ -55,7 +55,6 @@ export class Searchbar implements OnInit, OnDestroy {
       }),
       takeUntil(this.destroy$)
     ).subscribe((items) => {
-      console.log(items)
       this.results.set(items);
       this.loading.set(false);
       this.showDropdown.set(items.length > 0);
@@ -94,7 +93,6 @@ export class Searchbar implements OnInit, OnDestroy {
     }
     this.error.set('');
     this.showDropdown.set(false);
-    // console.log(this.searchType);
     this.router.navigate(['/results'], {
       queryParams: { query, type: this.searchType },
     });

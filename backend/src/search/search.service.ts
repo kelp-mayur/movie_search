@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
@@ -128,13 +125,6 @@ export class SearchService {
           },
         },
       },
-      // {
-      //   constant_score: {
-      //     filter: {
-      //       match: { 'movie_title.prefix': { query: q, operator: 'and' } },
-      //     },
-      //   },
-      // },
     ];
     return clauses;
   }
@@ -186,16 +176,6 @@ export class SearchService {
 
       ...this.buildPersonClauses('cast', q),
 
-      // {
-      //   constant_score: {
-      //     filter: { term: { genres: q.toLowerCase() } },
-      //   },
-      // },
-      // {
-      //   constant_score: {
-      //     filter: { prefix: { genres: q.toLowerCase() } },
-      //   },
-      // },
       { match: { keywords: { query: q, operator: 'and' } } },
     ];
 
@@ -303,12 +283,12 @@ export class SearchService {
         post_tags: ['</mark>'],
         require_field_match: false,
         number_of_fragments: 0,
-        fields: highlightFields as any,
+        fields: highlightFields,
       },
       _source: true,
     });
 
-    const result = res.hits.hits.map((hit: any) => ({
+    const result = res.hits.hits.map((hit) => ({
       id: hit._id,
       ...hit._source,
       highlight: hit.highlight,

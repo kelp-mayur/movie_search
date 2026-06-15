@@ -3,9 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { catchError, map, Observable, of } from 'rxjs';
 import { environment } from './environment';
 
-// ---------------------------------------------------------------------------
-// Movie shape matches the NEW index schema (movies_bulk.ndjson)
-// ---------------------------------------------------------------------------
+
 export interface Movie {
 [x: string]: any;
   id: string;
@@ -55,9 +53,7 @@ export class SearchService {
 
   private extractMovies(res: any): Movie[] {
     if (!res) return [];
-    // Backend returns { result: Movie[] }
     if (Array.isArray(res.result)) return res.result as Movie[];
-    // nested result.result
     if (Array.isArray(res.result?.result)) return res.result.result as Movie[];
     return [];
   }
