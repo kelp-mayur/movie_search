@@ -1,9 +1,10 @@
-import { Component, OnDestroy, inject, Input, OnInit, ElementRef, signal } from '@angular/core';
+import { Component, OnDestroy, inject, OnInit, ElementRef, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { catchError, debounceTime, distinctUntilChanged, of, Subject, switchMap, takeUntil } from 'rxjs';
 import { SearchService, Movie } from '../search.service';
+import { HttpErrorResponse } from '@angular/common/http';
 
 @Component({
   selector: 'app-searchbar',
@@ -47,8 +48,8 @@ export class Searchbar implements OnInit, OnDestroy {
         this.error.set('');
         
         return this.searchService.search(trimmed, this.searchType).pipe(
-          catchError(() => {
-            this.error.set('Search failed.');
+          catchError((err: HttpErrorResponse) => {
+            this.error.set(err.message);
             return of([]);
           })
         );

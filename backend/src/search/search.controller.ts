@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { SearchService } from './search.service';
 import * as zodSchema from './zod.schema';
-import { ZodValidationPipe } from './zodPipe';
+import { ZodValidationPipe } from './zod-validation.pipe';
 
 @Controller('/api/v1')
 export class SearchController {

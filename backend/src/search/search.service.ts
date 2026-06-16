@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
 import { SearchDto } from './zod.schema';
+import { QueryDslQueryContainer } from '@elastic/elasticsearch/lib/api/types';
 
 @Injectable()
 export class SearchService {
@@ -27,20 +28,15 @@ export class SearchService {
         return this.searchByCast(query);
       case 'keyword':
         return this.searchByKeywordOrGenre(query);
-      default:
-        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-        throw new Error(`Unsupported type: ${type}`);
     }
   }
 
   async movieDetails(id: string) {
-    const res = await this.es.search({
-      index: this.index,
-      query: { term: { _id: id } },
-      size: 1,
-    });
-    const hit = res.hits.hits[0];
-    return hit ? hit._source : null;
+    const res = await this.es.get({ index: this.index, id });
+    if (!res) {
+      throw new NotFoundException(`Movie with id ${id} not found`);
+    }
+    return res;
   }
 
   private buildTitleClauses(query: string): unknown[] {
@@ -108,7 +104,17 @@ export class SearchService {
           boost: 90,
         },
       },
-
+      {
+        constant_score: {
+          filter: {
+            prefix:{
+              movie_title_compact:{
+                movie_title_normalized: compact,
+              }
+            }
+          }
+        }
+      },
       {
         constant_score: {
           filter: {
@@ -218,11 +224,10 @@ export class SearchService {
           boost: 40,
         },
       },
-      { match: { keywords: { query, operator: 'and' } }, boost: 30 },
+      { match: { keywords: { query, operator: 'and' }, boost: 30 } },
       {
         constant_score: {
-          filter: { term: { 'keywords.keyword': qLower }, boost: 50 },
-          boost: 2,
+          filter: { term: { 'keywords.keyword': qLower }, boost: 2 },
         },
       },
     ];
@@ -244,7 +249,7 @@ export class SearchService {
         function_score: {
           query: {
             bool: {
-              should: shouldClauses as any,
+              should: shouldClauses as QueryDslQueryContainer,
               minimum_should_match: 1,
             },
           },
