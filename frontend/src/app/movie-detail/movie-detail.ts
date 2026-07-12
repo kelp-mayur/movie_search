@@ -2,7 +2,7 @@ import { Component, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
+import { finalize, takeUntil } from 'rxjs/operators';
 import { SearchService, Movie } from '../search.service';
 
 @Component({
@@ -29,12 +29,12 @@ export class MovieDetail implements OnDestroy {
       this.error.set('');
       this.loading.set(true);
 
-      this.searchService.getMovieDetails(id).subscribe({
+      this.searchService.getMovieDetails(id).pipe(finalize(()=> this.loading.set(false))).subscribe({
         next: (movie) => {
           if (!movie) this.error.set('Movie not found.');
           else this.movie.set(movie);
         },
-        error: () => this.error.set('Unable to load movie details.'),
+        error: (err) => this.error.set(err.message),
         complete: () => this.loading.set(false),
       });
     });

@@ -1,0 +1,260 @@
+{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0,
+
+    "analysis": {
+      "char_filter": {
+        "separator_filter": {
+          "type": "pattern_replace",
+          "pattern": "[\\-_.:&/,!?]+",
+          "replacement": " "
+        },
+        "compound_char_filter": {
+          "type": "pattern_replace",
+          "pattern": "[\\-_.:&/,!?\\s'\"]+",
+          "replacement": ""
+        }
+      },
+
+      "filter": {
+        "edge_ngram_filter": {
+          "type": "edge_ngram",
+          "min_gram": 2,
+          "max_gram": 20,
+          "preserve_original": true
+        },
+
+        "shingle_filter": {
+          "type": "shingle",
+          "min_shingle_size": 2,
+          "max_shingle_size": 3,
+          "output_unigrams": true
+        }
+      },
+
+      "normalizer": {
+        "lowercase_normalizer": {
+          "type": "custom",
+          "filter": [
+            "lowercase",
+            "asciifolding"
+          ]
+        }
+      },
+
+      "analyzer": {
+        "title_index": {
+          "type": "custom",
+          "char_filter": [
+            "separator_filter"
+          ],
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase",
+            "asciifolding",
+            "edge_ngram_filter"
+          ]
+        },
+
+        "title_search": {
+          "type": "custom",
+          "char_filter": [
+            "separator_filter"
+          ],
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase",
+            "asciifolding"
+          ]
+        },
+
+        "compound_index": {
+          "type": "custom",
+          "char_filter": [
+            "compound_char_filter"
+          ],
+          "tokenizer": "keyword",
+          "filter": [
+            "lowercase",
+            "asciifolding",
+            "edge_ngram_filter"
+          ]
+        },
+
+        "compound_search": {
+          "type": "custom",
+          "char_filter": [
+            "compound_char_filter"
+          ],
+          "tokenizer": "keyword",
+          "filter": [
+            "lowercase",
+            "asciifolding"
+          ]
+        },
+
+        "shingle_index": {
+          "type": "custom",
+          "char_filter": [
+            "separator_filter"
+          ],
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase",
+            "asciifolding",
+            "shingle_filter"
+          ]
+        }
+      }
+    }
+  },
+
+  "mappings": {
+    "dynamic": false,
+
+    "properties": {
+      "_all_text": {
+        "type": "text",
+        "analyzer": "title_search"
+      },
+
+      "movie_id": {
+        "type": "long"
+      },
+
+      "movie_title": {
+        "type": "text",
+        "analyzer": "title_search",
+        "copy_to": "_all_text",
+
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "normalizer": "lowercase_normalizer"
+          },
+
+          "prefix": {
+            "type": "text",
+            "analyzer": "title_index",
+            "search_analyzer": "title_search"
+          },
+
+          "compound": {
+            "type": "text",
+            "analyzer": "compound_index",
+            "search_analyzer": "compound_search"
+          },
+
+          "shingle": {
+            "type": "text",
+            "analyzer": "shingle_index",
+            "search_analyzer": "title_search"
+          },
+
+          "suggest": {
+            "type": "search_as_you_type",
+            "max_shingle_size": 3
+          }
+        }
+      },
+
+      "director": {
+        "type": "text",
+        "analyzer": "title_search",
+        "copy_to": "_all_text",
+
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "normalizer": "lowercase_normalizer"
+          },
+
+          "prefix": {
+            "type": "text",
+            "analyzer": "title_index",
+            "search_analyzer": "title_search"
+          }
+        }
+      },
+
+      "cast": {
+        "type": "text",
+        "analyzer": "title_search",
+        "copy_to": "_all_text",
+
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "normalizer": "lowercase_normalizer"
+          },
+
+          "prefix": {
+            "type": "text",
+            "analyzer": "title_index",
+            "search_analyzer": "title_search"
+          }
+        }
+      },
+
+      "keywords": {
+        "type": "text",
+        "analyzer": "title_search",
+        "copy_to": "_all_text",
+
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "normalizer": "lowercase_normalizer"
+          }
+        }
+      },
+
+      "genres": {
+        "type": "keyword",
+        "normalizer": "lowercase_normalizer"
+      },
+
+      "overview": {
+        "type": "text",
+        "analyzer": "title_search"
+      },
+
+      "original_title": {
+        "type": "text",
+        "analyzer": "title_search",
+        "copy_to": "_all_text"
+      },
+
+      "movie_title_normalized": {
+        "type": "keyword",
+        "normalizer": "lowercase_normalizer"
+      },
+
+      "movie_title_compact": {
+        "type": "keyword",
+        "normalizer": "lowercase_normalizer"
+      },
+
+      "imdb_rating": {
+        "type": "float"
+      },
+
+      "imdb_vote_count": {
+        "type": "integer"
+      },
+
+      "user_rating": {
+        "type": "float"
+      },
+
+      "user_rating_count": {
+        "type": "integer"
+      },
+
+      "popularity": {
+        "type": "float"
+      }
+    }
+  }
+}

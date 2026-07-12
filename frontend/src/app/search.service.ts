@@ -1,13 +1,11 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
-import { catchError, map, Observable, of } from 'rxjs';
+import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
+import { catchError, map, Observable, of, throwError } from 'rxjs';
 import { environment } from './environment';
 
 
 export interface Movie {
-[x: string]: any;
   id: string;
-  movie_id?: number;
   movie_title?: string;
   original_title?: string;
   director?: string[];
@@ -32,6 +30,10 @@ export interface Movie {
   };
 }
 
+
+export interface responseSearch {
+  result: Movie[],
+}
 @Injectable({ providedIn: 'root' })
 export class SearchService {
   private readonly http = inject(HttpClient);
@@ -39,22 +41,21 @@ export class SearchService {
 
   search(query: string, type = 'all'): Observable<Movie[]> {
     const params = new HttpParams().set('query', query).set('type', type);
-    return this.http.get<any>(`${this.baseUrl}/movies/search`, { params }).pipe(
-      map((res) => this.extractMovies(res)),
-      catchError(() => of([])),
+    return this.http.get<responseSearch>(`${this.baseUrl}/movies/search`, { params }).pipe(
+      map((res: responseSearch) => this.extractMovies(res)),
+      catchError((err:HttpErrorResponse) => {return throwError(() => err)}),
     );
   }
 
-  getMovieDetails(id: string): Observable<Movie | undefined> {
+  getMovieDetails(id: string): Observable<Movie> {
     return this.http.get<Movie>(`${this.baseUrl}/movie/${id}`).pipe(
-      catchError(() => of(undefined)),
+      catchError((err: HttpErrorResponse) => {return throwError(() => err)}),
     );
   }
 
-  private extractMovies(res: any): Movie[] {
+  private extractMovies(res: responseSearch): Movie[] {
     if (!res) return [];
-    if (Array.isArray(res.result)) return res.result as Movie[];
-    if (Array.isArray(res.result?.result)) return res.result.result as Movie[];
+    if (Array.isArray(res.result)) return res.result;
     return [];
   }
 }
