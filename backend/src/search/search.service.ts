@@ -12,31 +12,44 @@ export class SearchService {
     private readonly es: ElasticsearchService,
     private readonly config: ConfigService,
   ) {
-    this.index = this.config.get('INDEX') ?? 'movies8';
+    this.index = this.config.get('INDEX') ?? 'imdbmovies_alias';
   }
 
   async search(dto: SearchDto) {
-    const { query, type = 'all' } = dto;
+    const { query, type = 'all', page = 1, limit = 30, genre } = dto;
+    const pagination = { page, limit };
+
     switch (type) {
       case 'all':
-        return this.searchAll(query);
+        return this.searchAll(query, pagination, genre);
       case 'movie':
-        return this.searchByTitle(query);
+        return this.searchByTitle(query, pagination, genre);
       case 'director':
-        return this.searchByDirector(query);
+        return this.searchByDirector(query, pagination, genre);
       case 'actor':
-        return this.searchByCast(query);
+        return this.searchByCast(query, pagination, genre);
       case 'keyword':
-        return this.searchByKeywordOrGenre(query);
+        return this.searchByKeywordOrGenre(query, pagination, genre);
     }
   }
 
   async movieDetails(id: string) {
-    const res = await this.es.get({ index: this.index, id });
-    if (!res) {
-      throw new NotFoundException(`Movie with id ${id} not found`);
+    try {
+      const res = await this.es.get<Record<string, unknown>>({ index: this.index, id });
+      if (!res.found || !res._source) {
+        throw new NotFoundException(`Movie with id ${id} not found`);
+      }
+      return {
+        id: res._id,
+        ...res._source,
+      };
+    } catch (error: unknown) {
+      const err = error as { statusCode?: number; meta?: { statusCode?: number } };
+      if (err?.statusCode === 404 || err?.meta?.statusCode === 404) {
+        throw new NotFoundException(`Movie with id ${id} not found`);
+      }
+      throw error;
     }
-    return res;
   }
 
   private buildTitleClauses(query: string): unknown[] {
@@ -48,26 +61,75 @@ export class SearchService {
       return [
         {
           constant_score: {
-            filter: { term: { 'movie_title.keyword': qLower } },
+            filter: {
+              term: {
+                'movie_title.keyword': {
+                  value: qLower,
+                  case_insensitive: true,
+                },
+              },
+            },
             boost: 100,
           },
         },
         {
           constant_score: {
-            filter: { term: { movie_title_normalized: qLower } },
+            filter: {
+              term: {
+                movie_title_normalized: {
+                  value: qLower,
+                  case_insensitive: true,
+                },
+              },
+            },
             boost: 100,
           },
         },
         {
           constant_score: {
-            filter: { prefix: { 'movie_title.keyword': qLower } },
-            boost: 90,
+            filter: {
+              prefix: {
+                'movie_title.keyword': {
+                  value: qLower,
+                  case_insensitive: true,
+                },
+              },
+            },
+            boost: 95,
           },
         },
         {
           constant_score: {
-            filter: { prefix: { movie_title_normalized: qLower } },
+            filter: {
+              prefix: {
+                movie_title_normalized: {
+                  value: qLower,
+                  case_insensitive: true,
+                },
+              },
+            },
+            boost: 95,
+          },
+        },
+        {
+          constant_score: {
+            filter: {
+              prefix: {
+                movie_title_compact: {
+                  value: compact,
+                  case_insensitive: true,
+                },
+              },
+            },
             boost: 90,
+          },
+        },
+        {
+          match_phrase_prefix: {
+            movie_title: {
+              query: q,
+              boost: 85,
+            },
           },
         },
       ];
@@ -76,44 +138,98 @@ export class SearchService {
     const clauses: unknown[] = [
       {
         constant_score: {
-          filter: { term: { 'movie_title.keyword': qLower } },
+          filter: {
+            term: {
+              'movie_title.keyword': {
+                value: qLower,
+                case_insensitive: true,
+              },
+            },
+          },
           boost: 100,
         },
       },
       {
         constant_score: {
-          filter: { term: { movie_title_normalized: qLower } },
+          filter: {
+            term: {
+              movie_title_normalized: {
+                value: qLower,
+                case_insensitive: true,
+              },
+            },
+          },
           boost: 100,
         },
       },
       {
         constant_score: {
-          filter: { term: { movie_title_compact: compact } },
+          filter: {
+            term: {
+              movie_title_compact: {
+                value: compact,
+                case_insensitive: true,
+              },
+            },
+          },
           boost: 100,
         },
       },
       {
-        constant_score: {
-          filter: { prefix: { 'movie_title.keyword': qLower } },
-          boost: 90,
+        match_phrase: {
+          movie_title: {
+            query: q,
+            slop: 1,
+            boost: 95,
+          },
+        },
+      },
+      {
+        match_phrase_prefix: {
+          movie_title: {
+            query: q,
+            boost: 90,
+          },
         },
       },
       {
         constant_score: {
-          filter: { prefix: { movie_title_normalized: qLower } },
+          filter: {
+            prefix: {
+              'movie_title.keyword': {
+                value: qLower,
+                case_insensitive: true,
+              },
+            },
+          },
           boost: 90,
         },
       },
       {
         constant_score: {
           filter: {
-            prefix:{
-              movie_title_compact:{
-                movie_title_normalized: compact,
-              }
-            }
-          }
-        }
+            prefix: {
+              movie_title_normalized: {
+                value: qLower,
+                case_insensitive: true,
+              },
+            },
+          },
+          boost: 90,
+        },
+      },
+      {
+        constant_score: {
+          filter: {
+            prefix: {
+              movie_title_compact: {
+                value: compact,
+                case_insensitive: true,
+              },
+            },
+          },
+          boost: 85,
+        },
       },
       {
         constant_score: {
@@ -129,6 +245,35 @@ export class SearchService {
               ],
             },
           },
+          boost: 75,
+        },
+      },
+      {
+        match: {
+          movie_title: {
+            query: q,
+            operator: 'and',
+            boost: 60,
+          },
+        },
+      },
+      {
+        match: {
+          'movie_title.stemmed': {
+            query: q,
+            operator: 'and',
+            boost: 45,
+          },
+        },
+      },
+      {
+        match: {
+          movie_title: {
+            query: q,
+            fuzziness: 'AUTO:3,6',
+            operator: 'and',
+            boost: 20,
+          },
         },
       },
     ];
@@ -143,13 +288,27 @@ export class SearchService {
       return [
         {
           constant_score: {
-            filter: { term: { [`${field}.keyword`]: qLower } },
-            boost: 70,
+            filter: {
+              term: {
+                [`${field}.keyword`]: {
+                  value: qLower,
+                  case_insensitive: true,
+                },
+              },
+            },
+            boost: 65,
           },
         },
         {
           constant_score: {
-            filter: { prefix: { [`${field}.keyword`]: qLower } },
+            filter: {
+              prefix: {
+                [`${field}.keyword`]: {
+                  value: qLower,
+                  case_insensitive: true,
+                },
+              },
+            },
             boost: 50,
           },
         },
@@ -159,61 +318,109 @@ export class SearchService {
     return [
       {
         constant_score: {
-          filter: { term: { [`${field}.keyword`]: qLower } },
-          boost: 60,
+          filter: {
+            term: {
+              [`${field}.keyword`]: {
+                value: qLower,
+                case_insensitive: true,
+              },
+            },
+          },
+          boost: 65,
         },
       },
       {
         constant_score: {
-          filter: { prefix: { [`${field}.keyword`]: qLower } },
-          boost: 50,
+          filter: {
+            prefix: {
+              [`${field}.keyword`]: {
+                value: qLower,
+                case_insensitive: true,
+              },
+            },
+          },
+          boost: 55,
+        },
+      },
+      {
+        match: {
+          [field]: {
+            query: q,
+            operator: 'and',
+            boost: 45,
+          },
+        },
+      },
+      {
+        match: {
+          [field]: {
+            query: q,
+            fuzziness: 'AUTO:3,6',
+            operator: 'and',
+            boost: 20,
+          },
         },
       },
     ];
   }
 
-  private async searchAll(query: string) {
+  private async searchAll(
+    query: string,
+    pagination = { page: 1, limit: 30 },
+    genre?: string,
+  ) {
     const q = query.trim();
+    const qLower = q.toLowerCase();
 
-    const shouldClauses: unknown[] = [
-      ...this.buildTitleClauses(q),
+    const candidates: unknown[] = [...this.buildTitleClauses(q)];
 
-      ...this.buildPersonClauses('director', q),
+    // For short queries (<= 2 chars), user is typing a title prefix.
+    // Searching cast on single characters causes massive false positives.
+    // Only expand to cast, director, genres, and keywords for queries >= 3 chars.
+    if (q.length >= 3) {
+      candidates.push(
+        ...this.buildPersonClauses('director', q),
+        ...this.buildPersonClauses('cast', q),
+        { constant_score: { filter: { term: { genres: qLower } }, boost: 35 } },
+        { match: { keywords: { query: q, operator: 'and', boost: 30 } } },
+        { match: { overview: { query: q, boost: 20 } } },
+      );
+    }
 
-      ...this.buildPersonClauses('cast', q),
-
-      { match: { keywords: { query: q, operator: 'and' } } },
-    ];
-
-    return this.runSearch(shouldClauses, {
-      movie_title: {},
-      director: {},
-      cast: {},
-      genres: {},
-      keywords: {},
-    });
+    return this.runSearch(candidates, q, pagination, genre);
   }
 
-  private async searchByTitle(query: string) {
-    return this.runSearch(this.buildTitleClauses(query), { movie_title: {} });
+  private async searchByTitle(
+    query: string,
+    pagination = { page: 1, limit: 30 },
+    genre?: string,
+  ) {
+    return this.runSearch(this.buildTitleClauses(query), query, pagination, genre);
   }
 
-  private async searchByDirector(query: string) {
-    return this.runSearch(this.buildPersonClauses('director', query), {
-      director: {},
-      movie_title: {},
-    });
+  private async searchByDirector(
+    query: string,
+    pagination = { page: 1, limit: 30 },
+    genre?: string,
+  ) {
+    return this.runSearch(this.buildPersonClauses('director', query), query, pagination, genre);
   }
 
-  private async searchByCast(query: string) {
-    return this.runSearch(this.buildPersonClauses('cast', query), {
-      cast: {},
-      movie_title: {},
-    });
+  private async searchByCast(
+    query: string,
+    pagination = { page: 1, limit: 30 },
+    genre?: string,
+  ) {
+    return this.runSearch(this.buildPersonClauses('cast', query), query, pagination, genre);
   }
 
-  private async searchByKeywordOrGenre(query: string) {
-    const qLower = query.trim().toLowerCase();
+  private async searchByKeywordOrGenre(
+    query: string,
+    pagination = { page: 1, limit: 30 },
+    genre?: string,
+  ) {
+    const q = query.trim();
+    const qLower = q.toLowerCase();
     const clauses: unknown[] = [
       {
         constant_score: { filter: { term: { genres: qLower } }, boost: 50 },
@@ -224,81 +431,230 @@ export class SearchService {
           boost: 40,
         },
       },
-      { match: { keywords: { query, operator: 'and' }, boost: 30 } },
+      { match: { keywords: { query: q, operator: 'and', boost: 30 } } },
       {
         constant_score: {
-          filter: { term: { 'keywords.keyword': qLower }, boost: 2 },
+          filter: { term: { 'keywords.keyword': qLower }, boost: 20 },
+        },
+      },
+      {
+        match: {
+          keywords: {
+            query: q,
+            fuzziness: 'AUTO:3,6',
+            operator: 'and',
+            boost: 15,
+          },
+        },
+      },
+      {
+        match: {
+          overview: {
+            query: q,
+            boost: 15,
+          },
         },
       },
     ];
-    return this.runSearch(clauses, {
-      genres: {},
-      keywords: {},
-    });
+    return this.runSearch(clauses, query, pagination, genre);
   }
 
   private async runSearch(
-    shouldClauses: unknown[],
-    highlightFields: Record<string, object>,
-    size = 30,
+    queries: unknown[],
+    queryText: string,
+    pagination = { page: 1, limit: 30 },
+    genre?: string,
   ) {
-    const res = await this.es.search({
-      index: this.index,
-      size,
-      query: {
-        function_score: {
-          query: {
-            bool: {
-              should: shouldClauses as QueryDslQueryContainer,
-              minimum_should_match: 1,
+    const q = queryText.trim();
+    const { page, limit } = pagination;
+    const from = (page - 1) * limit;
+    const size = limit;
+
+    const filterClauses: unknown[] = [];
+    if (genre && genre.trim()) {
+      filterClauses.push({
+        term: {
+          genres: genre.trim().toLowerCase(),
+        },
+      });
+    }
+
+    try {
+      const res = await this.es.search({
+        index: this.index,
+        from,
+        size,
+        query: {
+          function_score: {
+            query: {
+              bool: {
+                must: [
+                  {
+                    dis_max: {
+                      queries: queries as QueryDslQueryContainer[],
+                      tie_breaker: 0.2,
+                    },
+                  },
+                ],
+                filter: filterClauses as QueryDslQueryContainer[],
+              },
+            },
+            functions: [
+              {
+                field_value_factor: {
+                  field: 'imdb_rating',
+                  factor: 0.5,
+                  modifier: 'none',
+                  missing: 5.0,
+                },
+              },
+              {
+                field_value_factor: {
+                  field: 'popularity',
+                  factor: 0.1,
+                  modifier: 'log1p',
+                  missing: 0,
+                },
+              },
+              {
+                field_value_factor: {
+                  field: 'imdb_vote_count',
+                  factor: 0.0001,
+                  modifier: 'log1p',
+                  missing: 0,
+                },
+                weight: 0.3,
+              },
+            ],
+            score_mode: 'sum',
+            boost_mode: 'sum',
+          },
+        },
+        aggs: {
+          genres: {
+            terms: {
+              field: 'genres',
+              size: 15,
             },
           },
-          functions: [
-            {
-              field_value_factor: {
-                field: 'popularity',
-                factor: 100,
-                modifier: 'log1p',
-                missing: 0,
-              },
+          ratings: {
+            range: {
+              field: 'imdb_rating',
+              ranges: [
+                { from: 8.0, key: '8.0+ Highly Rated' },
+                { from: 6.0, to: 8.0, key: '6.0 - 7.9 Good' },
+                { to: 6.0, key: 'Below 6.0' },
+              ],
             },
-            {
-              field_value_factor: {
-                field: 'imdb_rating',
-                factor: 50,
-                modifier: 'none',
-                missing: 0,
-              },
-            },
-            {
-              field_value_factor: {
-                field: 'imdb_vote_count',
-                factor: 20,
-                modifier: 'log1p',
-                missing: 0,
-              },
-            },
-          ],
-          score_mode: 'sum',
-          boost_mode: 'sum',
+          },
         },
-      },
-      highlight: {
-        pre_tags: ['<mark>'],
-        post_tags: ['</mark>'],
-        require_field_match: false,
-        number_of_fragments: 0,
-        fields: highlightFields,
-      },
-      _source: true,
-    });
+        highlight: {
+          pre_tags: ['<mark>'],
+          post_tags: ['</mark>'],
+          require_field_match: false,
+          number_of_fragments: 0,
+          fields: {
+            movie_title: {
+              highlight_query: {
+                bool: {
+                  should: [
+                    { match_phrase_prefix: { movie_title: q } },
+                    { match_phrase: { movie_title: { query: q, slop: 2 } } },
+                    { match: { movie_title: q } },
+                  ],
+                },
+              },
+            },
+            director: {
+              highlight_query: {
+                bool: {
+                  should: [
+                    { match_phrase_prefix: { director: q } },
+                    { match: { director: q } },
+                  ],
+                },
+              },
+            },
+            cast: {
+              highlight_query: {
+                bool: {
+                  should: [
+                    { match_phrase_prefix: { cast: q } },
+                    { match: { cast: q } },
+                  ],
+                },
+              },
+            },
+            genres: {},
+            keywords: {},
+          },
+          encoder: 'html',
+        },
+        _source: true,
+      });
 
-    const result = res.hits.hits.map((hit) => ({
-      id: hit._id,
-      ...hit._source,
-      highlight: hit.highlight,
-    }));
+      const totalHits =
+        typeof res.hits.total === 'object'
+          ? res.hits.total.value
+          : res.hits.total ?? 0;
+      const totalPages = Math.ceil(totalHits / limit);
 
-    return { result };
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+      const result = res.hits.hits.map((hit) => ({
+        id: hit._id,
+        ...hit._source!,
+        highlight: hit.highlight,
+      }));
+
+      const genreAggs = res.aggregations?.genres as
+        | { buckets?: { key: string; doc_count: number }[] }
+        | undefined;
+      const ratingAggs = res.aggregations?.ratings as
+        | { buckets?: { key: string; doc_count: number }[] }
+        | undefined;
+
+      return {
+        result,
+        pagination: {
+          page,
+          limit,
+          total: totalHits,
+          totalPages,
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1,
+        },
+        facets: {
+          genres: genreAggs?.buckets ?? [],
+          ratings: ratingAggs?.buckets ?? [],
+        },
+      };
+    } catch (error: unknown) {
+      console.error(
+        `[SearchService] Search failed on index "${this.index}":`,
+        error,
+      );
+      const err = error as { meta?: { body?: unknown } };
+      if (err.meta?.body) {
+        console.error(
+          '[SearchService] Elasticsearch error details:',
+          JSON.stringify(err.meta.body),
+        );
+      }
+      return {
+        result: [],
+        pagination: {
+          page,
+          limit,
+          total: 0,
+          totalPages: 0,
+          hasNextPage: false,
+          hasPrevPage: false,
+        },
+        facets: {
+          genres: [],
+          ratings: [],
+        },
+      };
+    }
   }
 }

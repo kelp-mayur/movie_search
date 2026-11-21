@@ -14,11 +14,11 @@ FROM node:20-alpine As Production
 
 WORKDIR /app
  
-COPY --from=Builder /app/dist/frontend ./dist/frontend
+COPY --from=Builder /app/dist/frontend/browser ./dist
 
-RUN npm install -g server
+RUN npm install -g serve
 
 EXPOSE 4201
 
-CMD ["server", "-s" ,"dist", "-l", "4201"]
+CMD ["serve", "-s", "dist", "-l", "4201"]
 

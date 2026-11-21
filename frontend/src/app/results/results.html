@@ -5,7 +5,7 @@
         <span class="badge">Catalog Search</span>
         <h2 class="title">Results for "{{ query() }}"</h2>
         <p class="subtitle">
-          Found <strong>{{ results().length }}</strong> matching records in <strong>{{ searchMode }}</strong>.
+          Found <strong>{{ pagination() ? (pagination()!.total | number) : results().length }}</strong> matching records in <strong>{{ searchMode }}</strong>.
         </p>
       </div>
       <div class="hero-right" *ngIf="query()">
@@ -15,6 +15,29 @@
         </div>
       </div>
     </header>
+
+    <!-- Genre Facets Row -->
+    <div class="facets-row" *ngIf="genreFacets().length > 0">
+      <span class="facet-title">Genres:</span>
+      <button
+        *ngFor="let g of genreFacets()"
+        class="facet-chip"
+        [class.is-active]="selectedGenre().toLowerCase() === g.key.toLowerCase()"
+        (click)="toggleGenre(g.key)"
+        type="button"
+      >
+        {{ g.key }} <span class="facet-count">({{ g.doc_count | number }})</span>
+      </button>
+      <button
+        *ngIf="selectedGenre()"
+        class="facet-chip is-clear"
+        (click)="toggleGenre(selectedGenre())"
+        type="button"
+      >
+        ✕ Clear Filter
+      </button>
+    </div>
+
     <div *ngIf="loading()" class="status-box">
       <span class="loader"></span>
       <p>Fetching records from the index...</p>
@@ -81,6 +104,29 @@
           </footer>
         </div>
       </article>
+
+      <!-- Pagination controls -->
+      <footer class="pagination-bar" *ngIf="pagination() && pagination()!.totalPages > 1">
+        <button
+          class="page-btn"
+          [disabled]="!pagination()!.hasPrevPage"
+          (click)="goToPage(pagination()!.page - 1)"
+          type="button"
+        >
+          ← Previous
+        </button>
+        <span class="page-info">
+          Page <strong>{{ pagination()!.page }}</strong> of <strong>{{ pagination()!.totalPages }}</strong>
+        </span>
+        <button
+          class="page-btn"
+          [disabled]="!pagination()!.hasNextPage"
+          (click)="goToPage(pagination()!.page + 1)"
+          type="button"
+        >
+          Next →
+        </button>
+      </footer>
     </div>
   </div>
 </section>

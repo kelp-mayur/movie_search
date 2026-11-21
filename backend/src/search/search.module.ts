@@ -2,18 +2,22 @@ import { Module } from '@nestjs/common';
 import { SearchController } from './search.controller';
 import { SearchService } from './search.service';
 import { ElasticsearchModule } from '@nestjs/elasticsearch';
-import { ConfigService } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
   imports: [
     ElasticsearchModule.registerAsync({
-      imports: [],
-      useFactory: (configService: ConfigService) => ({
-        node: configService.get<string>('ELASTICSEARCH_API'),
-        auth: {
-          apiKey: configService.get<string>('ELASTICSEARCH_KEY')!,
-        },
-      }),
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => {
+        const node = configService.get<string>('ELASTICSEARCH_API') ?? 'http://localhost:9200';
+        const apiKey = configService.get<string>('ELASTICSEARCH_KEY');
+
+        return {
+          node,
+          // Only attach auth if apiKey is present; local dev connects without auth
+          ...(apiKey ? { auth: { apiKey } } : {}),
+        };
+      },
       inject: [ConfigService],
     }),
   ],
