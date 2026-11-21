@@ -31,9 +31,29 @@ export interface Movie {
 }
 
 
-export interface responseSearch {
-  result: Movie[],
+export interface FacetBucket {
+  key: string;
+  doc_count: number;
 }
+
+export interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+}
+
+export interface responseSearch {
+  result: Movie[];
+  pagination?: PaginationMeta;
+  facets?: {
+    genres?: FacetBucket[];
+    ratings?: FacetBucket[];
+  };
+}
+
 @Injectable({ providedIn: 'root' })
 export class SearchService {
   private readonly http = inject(HttpClient);
@@ -43,13 +63,35 @@ export class SearchService {
     const params = new HttpParams().set('query', query).set('type', type);
     return this.http.get<responseSearch>(`${this.baseUrl}/movies/search`, { params }).pipe(
       map((res: responseSearch) => this.extractMovies(res)),
-      catchError((err:HttpErrorResponse) => {return throwError(() => err)}),
+      catchError((err: HttpErrorResponse) => throwError(() => err)),
+    );
+  }
+
+  searchCatalog(
+    query: string,
+    type = 'all',
+    page = 1,
+    limit = 30,
+    genre?: string,
+  ): Observable<responseSearch> {
+    let params = new HttpParams()
+      .set('query', query)
+      .set('type', type)
+      .set('page', page.toString())
+      .set('limit', limit.toString());
+
+    if (genre && genre.trim()) {
+      params = params.set('genre', genre.trim());
+    }
+
+    return this.http.get<responseSearch>(`${this.baseUrl}/movies/search`, { params }).pipe(
+      catchError((err: HttpErrorResponse) => throwError(() => err)),
     );
   }
 
   getMovieDetails(id: string): Observable<Movie> {
     return this.http.get<Movie>(`${this.baseUrl}/movie/${id}`).pipe(
-      catchError((err: HttpErrorResponse) => {return throwError(() => err)}),
+      catchError((err: HttpErrorResponse) => throwError(() => err)),
     );
   }
 

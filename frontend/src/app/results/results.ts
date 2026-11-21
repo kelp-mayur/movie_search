@@ -1,8 +1,8 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
-import { SearchService, Movie } from '../search.service';
-import { finalize, Subject, takeUntil } from 'rxjs';
+import { SearchService, Movie, PaginationMeta, FacetBucket, responseSearch } from '../search.service';
+import { catchError, finalize, map, of, Subject, switchMap, takeUntil, tap } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 
 @Component({
@@ -12,7 +12,7 @@ import { HttpErrorResponse } from '@angular/common/http';
   templateUrl: './results.html',
   styleUrl: './results.css',
 })
-export class Results implements OnInit{
+export class Results implements OnInit, OnDestroy {
   constructor(
     private readonly route: ActivatedRoute,
     private readonly router: Router,
@@ -25,41 +25,84 @@ export class Results implements OnInit{
   error = signal('');
   query = signal('');
   searchMode = 'All fields';
+  selectedGenre = signal('');
+  pagination = signal<PaginationMeta | null>(null);
+  genreFacets = signal<FacetBucket[]>([]);
 
-
-  ngOnInit(): void{
-    this.route.queryParamMap.pipe(takeUntil(this.destroy$)).subscribe((qp) => {
-      const queryValue = qp.get('query') ?? '';
-      const typeValue  = qp.get('type') ?? 'all';
-      this.query.set(queryValue);
-      this.searchMode = this.getSearchModeLabel(typeValue);
-      this.results.set([]);
-      this.error.set('');
-      this.loading.set(false);
-
-      if (queryValue.trim()) {
-        this.fetchResults(queryValue, typeValue);
-      } else {
-        this.error.set('Enter at least one character to search.');
-      }
-    });
+  ngOnInit(): void {
+    this.route.queryParamMap
+      .pipe(
+        map((qp) => ({
+          query: (qp.get('query') ?? '').trim(),
+          type: qp.get('type') ?? 'all',
+          page: Math.max(1, parseInt(qp.get('page') ?? '1', 10) || 1),
+          genre: qp.get('genre') ?? '',
+        })),
+        tap(({ query, type, genre }) => {
+          this.query.set(query);
+          this.searchMode = this.getSearchModeLabel(type);
+          this.selectedGenre.set(genre);
+          this.error.set('');
+          if (!query) {
+            this.loading.set(false);
+            this.results.set([]);
+            this.pagination.set(null);
+            this.error.set('Enter at least one character to search.');
+          } else {
+            this.loading.set(true);
+          }
+        }),
+        switchMap(({ query, type, page, genre }) => {
+          if (!query) {
+            return of<responseSearch>({ result: [] });
+          }
+          return this.searchService.searchCatalog(query, type, page, 30, genre).pipe(
+            catchError((err: HttpErrorResponse) => {
+              this.error.set(err.error?.message || 'Search failed. Please try again.');
+              return of<responseSearch>({ result: [] });
+            }),
+            finalize(() => this.loading.set(false)),
+          );
+        }),
+        takeUntil(this.destroy$),
+      )
+      .subscribe((res) => {
+        this.results.set(res.result || []);
+        this.pagination.set(res.pagination || null);
+        if (res.facets?.genres?.length) {
+          this.genreFacets.set(res.facets.genres);
+        }
+      });
   }
+
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
   }
-  private fetchResults(query: string, type = 'all') {
-    this.loading.set(true);
-    this.error.set('');
-    this.searchService.search(query, type).pipe(finalize(()=> this.loading.set(false))).subscribe({
-      next:     (movies:Movie[]) => this.results.set(movies),
-      error:    (err: HttpErrorResponse)       => this.error.set(err.message),
-      complete: ()       => this.loading.set(false),
-    });
-  }
 
   navigateToMovie(movie: Movie) {
     void this.router.navigate([movie.id]);
+  }
+
+  goToPage(targetPage: number): void {
+    if (!this.pagination() || targetPage < 1 || targetPage > this.pagination()!.totalPages) {
+      return;
+    }
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { page: targetPage },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  toggleGenre(genreKey: string): void {
+    const current = this.selectedGenre();
+    const newGenre = current.toLowerCase() === genreKey.toLowerCase() ? null : genreKey;
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { genre: newGenre, page: 1 },
+      queryParamsHandling: 'merge',
+    });
   }
 
   directorNames(movie: Movie): string {

@@ -22,7 +22,7 @@ export class Searchbar implements OnInit, OnDestroy {
   private readonly elementRef = inject(ElementRef);
 
   private readonly destroy$ = new Subject<void>();
-  private readonly searchTerm$ = new Subject<string>();
+  private readonly searchTrigger$ = new Subject<{ query: string; type: string }>();
   
   searchQuery = '';
   searchType = 'all';
@@ -32,10 +32,12 @@ export class Searchbar implements OnInit, OnDestroy {
   showDropdown = signal(false);
 
   private setupSearchStream(): void {
-    this.searchTerm$.pipe(
+    this.searchTrigger$.pipe(
       debounceTime(300),
-      distinctUntilChanged(),
-      switchMap((query) => {
+      distinctUntilChanged(
+        (prev, curr) => prev.query.trim() === curr.query.trim() && prev.type === curr.type
+      ),
+      switchMap(({ query, type }) => {
         const trimmed = query.trim();
         
         if (!trimmed) {
@@ -47,9 +49,9 @@ export class Searchbar implements OnInit, OnDestroy {
         this.showDropdown.set(true);
         this.error.set('');
         
-        return this.searchService.search(trimmed, this.searchType).pipe(
+        return this.searchService.search(trimmed, type).pipe(
           catchError((err: HttpErrorResponse) => {
-            this.error.set(err.message);
+            this.error.set(err.error?.message || 'Search failed. Please try again.');
             return of([]);
           })
         );
@@ -70,11 +72,11 @@ export class Searchbar implements OnInit, OnDestroy {
     const trimmed = this.searchQuery?.trim() ?? '';
     if (!trimmed) {
       this.resetResults();
-      this.searchTerm$.next('');
+      this.searchTrigger$.next({ query: '', type: this.searchType });
       return;
     }
     this.error.set('');
-    this.searchTerm$.next(this.searchQuery);
+    this.searchTrigger$.next({ query: this.searchQuery, type: this.searchType });
   }
   onFocus(): void {
     if (this.results().length > 0) {
@@ -106,9 +108,10 @@ export class Searchbar implements OnInit, OnDestroy {
   }
   setSearchType(value: string): void {
     this.searchType = value;
-    this.resetResults();
     if (this.searchQuery.trim()) {
-      this.searchTerm$.next(this.searchQuery);
+      this.searchTrigger$.next({ query: this.searchQuery, type: this.searchType });
+    } else {
+      this.resetResults();
     }
   }
 

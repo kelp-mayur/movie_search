@@ -30,6 +30,27 @@
           "min_shingle_size": 2,
           "max_shingle_size": 3,
           "output_unigrams": true
+        },
+
+        "english_stemmer": {
+          "type": "stemmer",
+          "language": "english"
+        },
+
+        "english_stop": {
+          "type": "stop",
+          "stopwords": "_english_"
+        },
+
+        "movie_synonyms": {
+          "type": "synonym_graph",
+          "synonyms": [
+            "sci fi, sci-fi, science fiction",
+            "romcom, rom-com, romantic comedy",
+            "animated, animation, cartoon",
+            "action-packed, action",
+            "superhero, super hero, superheroic"
+          ]
         }
       },
 
@@ -105,6 +126,35 @@
             "asciifolding",
             "shingle_filter"
           ]
+        },
+
+        "overview_index": {
+          "type": "custom",
+          "char_filter": [
+            "separator_filter"
+          ],
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase",
+            "asciifolding",
+            "english_stop",
+            "english_stemmer"
+          ]
+        },
+
+        "overview_search": {
+          "type": "custom",
+          "char_filter": [
+            "separator_filter"
+          ],
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase",
+            "asciifolding",
+            "english_stop",
+            "movie_synonyms",
+            "english_stemmer"
+          ]
         }
       }
     }
@@ -155,6 +205,12 @@
           "suggest": {
             "type": "search_as_you_type",
             "max_shingle_size": 3
+          },
+
+          "stemmed": {
+            "type": "text",
+            "analyzer": "overview_index",
+            "search_analyzer": "overview_search"
           }
         }
       },
@@ -217,7 +273,8 @@
 
       "overview": {
         "type": "text",
-        "analyzer": "title_search"
+        "analyzer": "overview_index",
+        "search_analyzer": "overview_search"
       },
 
       "original_title": {
